@@ -77,7 +77,7 @@
 #define LOG_BASE_ADDRESS (MAILBOX_DATA_PTR(4))
 #define LOG_ITEM_SIZE sizeof(float)
 #define LOG_CAPACITY  (4000/LOG_ITEM_SIZE)
-
+#define MAX_COUNT 0xFFFFFFFF
 /*
  * Parameters passed in MAILBOX_DATA(0):
  * READ: Generate a 10 usec pulse on selected gpio and then switch to the timer mode to capture duration.
@@ -93,11 +93,12 @@
 // The Timer Counter instance
 extern XTmrCtr TimerInst_0;
 
-inline u32 SET_OUT(u32 x,u32 n) {return(x &= ~(1 << n));}
-inline u32 SET_IN(u32 x,u32 n)  {return(x |= (1 << n));}
 
-inline u32 SET_LOW(u32 x,u32 n)  {return(x &= ~(1 << n));}
-inline u32 SET_HIGH(u32 x,u32 n) {return(x |= (1 << n));}
+#define SET_OUT(x,n) (x &= ~(1 << n))
+#define SET_IN(x,n)  (x |= (1 << n))
+
+#define SET_LOW(x,n)  (x &= ~(1 << n))
+#define SET_HIGH(x,n) (x |= (1 << n))
 
 void fun_Create10usPulse(u32 pin)
 {
@@ -131,6 +132,8 @@ u32 fun_CaptureDuration(u32 pin)
         */
         count1=0;
  	count2=0;
+	// Set Load Register with maximum value
+	XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TLR0, 0x0);
         /*
         * 0001 1001 0000 =>  no cascade, no all timers, no pwm,
         *                    clear interrupt status, enable timer,
@@ -143,16 +146,20 @@ u32 fun_CaptureDuration(u32 pin)
         // reset load bit and enable generate mode
         XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0x190);
         // wait for rising edge
-	while(!((Xil_In32(XPAR_GPIO_0_BASEADDR) & (1 << pin)));
+	while(!((Xil_In32(XPAR_GPIO_0_BASEADDR) & (1 << pin))));
         // read counter value
-        count1=XTmrCtr_ReadReg(XPAR_TMRCTR_0_BASEADDR, 0, TLR0);
+        count1=XTmrCtr_ReadReg(XPAR_TMRCTR_0_BASEADDR, 0, TCR0);
         // wait for falling edge
-	while((Xil_In32(XPAR_GPIO_0_BASEADDR) & (1 << pin));
+	while((Xil_In32(XPAR_GPIO_0_BASEADDR) & (1 << pin)));
 	// read counter value
-	count2=XTmrCtr_ReadReg(XPAR_TMRCTR_0_BASEADDR, 0, TLR0);
-	return(count2 - count1);	
+	count2=XTmrCtr_ReadReg(XPAR_TMRCTR_0_BASEADDR, 0, TCR0);
+	if(count2 > count1) {
+	 return (count2 - count1);
+	}
+	else {
+	return((MAX_COUNT - count1) + count2);	
+	}	
 }
-
 int main(void) {
     u32 cmd;
     u32 usranger_pin = 0;
@@ -181,9 +188,6 @@ int main(void) {
 		*                    disable external generate,
 		*                    up counter, generate mode
 		*/
-		// reset load bit and enable generate mode
-		XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0x190);
-
                 MAILBOX_CMD_ADDR = 0x0;
                 break;
             case READ:
@@ -191,14 +195,14 @@ int main(void) {
                 usranger_pin = MAILBOX_DATA(0);
 		fun_Create10usPulse(usranger_pin);
 		fun_ConfigureAsInput(usranger_pin);
-		value = fun_CaptureDuration();
+		value = fun_CaptureDuration(usranger_pin);
                 MAILBOX_DATA(0)=value;
                 MAILBOX_CMD_ADDR = 0x0;
                 break;
 
             case READ_AND_LOG_DATA:
                 // initialize logging variables, reset cmd
-                cb_init(&arduino_log, LOG_BASE_ADDRESS, 
+                cb_init(&pmod_log, LOG_BASE_ADDRESS, 
                         LOG_CAPACITY, LOG_ITEM_SIZE);
                 delay = MAILBOX_DATA(1);
                 MAILBOX_CMD_ADDR = 0x0;
@@ -207,7 +211,7 @@ int main(void) {
                     fun_Create10usPulse(usranger_pin);
 		    fun_ConfigureAsInput(usranger_pin);
 		    value = fun_CaptureDuration(usranger_pin);
-                    cb_push_back(&arduino_log, &value);
+                    cb_push_back(&pmod_log, &value);
                     delay_ms(delay);
                 } while((MAILBOX_CMD_ADDR & 0x1)== 0);
                 break;      
@@ -219,4 +223,3 @@ int main(void) {
     }
     return 0;
 }
-
