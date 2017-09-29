@@ -110,6 +110,9 @@ u32 duty = 1;
 #define SET_LOW(x,n)  (x &= ~(1 << n))
 #define SET_HIGH(x,n) (x |= (1 << n))
 
+// The Timer Counter instance
+extern XTmrCtr TimerInst_0;
+
 int main(void)
 {
     u32 cmd;
@@ -130,6 +133,8 @@ int main(void)
                           D_GPIO, D_GPIO, D_GPIO, D_GPIO, D_GPIO,
                           D_GPIO, D_GPIO, D_GPIO, D_GPIO,
                           D_GPIO, D_GPIO, D_GPIO, D_GPIO);
+    // by default tristate timer output
+    Xil_Out32(XPAR_GPIO_0_BASEADDR+0x08,1);
 
     while(1){
         // wait and store valid command
@@ -173,7 +178,7 @@ int main(void)
                                       iop_pins[16], iop_pins[17], 
                                       iop_pins[18]);
     		// by default tristate timer output
-    		Xil_Out32(XPAR_GPIO_0_BASEADDR,1);
+    		Xil_Out32(XPAR_GPIO_0_BASEADDR+0x08,1);
                 MAILBOX_CMD_ADDR = 0x0;
                 break;
 
@@ -257,6 +262,8 @@ int main(void)
 
             case RUN:
 		motor = MAILBOX_DATA(0);
+		// tri-state control negated so output can be driven
+                Xil_Out32(XPAR_GPIO_0_BASEADDR+0x08,0);
 		Channel_direction = Xil_In32(XPAR_GPIO_0_BASEADDR + 0x04);
 		Xil_Out32(XPAR_GPIO_0_BASEADDR + 0x04,SET_OUT(Channel_direction,(DIRA-5)));
 		Xil_Out32(XPAR_GPIO_0_BASEADDR + 0x04,SET_OUT(Channel_direction,(DIRB-5)));
