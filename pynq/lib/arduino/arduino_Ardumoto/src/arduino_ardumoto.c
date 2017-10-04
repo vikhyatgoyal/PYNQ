@@ -74,10 +74,10 @@
 #define TLR1 0x14
 // TCR1 Timer 1 Counter Register
 #define TCR1 0x18
-// Default period value for 100000 us
-#define MS1_VALUE 99998
+// Default period value for 490Hz
+#define MS1_VALUE 203998
 // Default period value for 50% duty cycle
-#define MS2_VALUE 49998
+#define MS2_VALUE 101998
 
 // Mailbox commands
 #define CONFIG_IOP_SWITCH  	0x1
@@ -110,21 +110,66 @@ u32 duty = 1;
 #define SET_LOW(x,n)  (x &= ~(1 << n))
 #define SET_HIGH(x,n) (x |= (1 << n))
 
-// The Timer Counter instance
-extern XTmrCtr TimerInst_0;
+/************************** Function Prototypes ******************************/
+void setup_start_timers_A(u32 duty) {
+
+    // Load timer's Load registers (period, high time)
+    XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TLR0, MS1_VALUE);
+    XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 1, TLR0, duty);
+    /*
+     * 0010 1011 0110 =>  no cascade, no all timers, enable pwm, 
+     *                    interrupt status, enable timer,
+     *                    no interrupt, no load timer, reload, 
+     *                    no capture, enable external generate, 
+     *                    down counter, generate mode
+     */
+    XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0x296);
+    XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 1, TCSR0, 0x296);
+}
+
+void setup_start_timers_B(u32 duty) {
+
+    // Load timer's Load registers (period, high time)
+    XTmrCtr_WriteReg(XPAR_TMRCTR_5_BASEADDR, 0, TLR0, MS1_VALUE);
+    XTmrCtr_WriteReg(XPAR_TMRCTR_5_BASEADDR, 1, TLR0, duty);
+    /*
+     * 0010 1011 0110 =>  no cascade, no all timers, enable pwm, 
+     *                    interrupt status, enable timer,
+     *                    no interrupt, no load timer, reload, 
+     *                    no capture, enable external generate, 
+     *                    down counter, generate mode
+     */
+    XTmrCtr_WriteReg(XPAR_TMRCTR_5_BASEADDR, 0, TCSR0, 0x296);
+    XTmrCtr_WriteReg(XPAR_TMRCTR_5_BASEADDR, 1, TCSR0, 0x296);
+}
+
+void stop_timers_A(void) {
+   //Stop the generation of PWM signal
+   // disable timer 0
+    XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0);
+   // disable timer 1
+    XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 1, TCSR0, 0);
+}
+void stop_timers_B(void) {
+   //Stop the generation of PWM signal
+   // disable timer 0
+    XTmrCtr_WriteReg(XPAR_TMRCTR_5_BASEADDR, 0, TCSR0, 0);
+   // disable timer 1
+    XTmrCtr_WriteReg(XPAR_TMRCTR_5_BASEADDR, 1, TCSR0, 0);
+}
 
 int main(void)
 {
     u32 cmd;
-    u32 Timer1Value, Timer2Value;
+    u32 timer_a_duty, timer_b_duty;
     u8 iop_pins[19];
     u8 	PWMA = 8,PWMB = 16,DIRA = 7,DIRB = 9;
     u8 reconfigure = 0;
     u8 dir_A = 0, dir_B = 0, dir = 0; //0 = forward 1 = reverse
+    u8 duty_a = 50, duty_b = 50; 
     motor_e motor = 0;
     u32 Channel_direction;
     u32 Channel_Data;
-
 
     arduino_init(0,0,0,0);
 
@@ -133,8 +178,6 @@ int main(void)
                           D_GPIO, D_GPIO, D_GPIO, D_GPIO, D_GPIO,
                           D_GPIO, D_GPIO, D_GPIO, D_GPIO,
                           D_GPIO, D_GPIO, D_GPIO, D_GPIO);
-    // by default tristate timer output
-    Xil_Out32(XPAR_GPIO_0_BASEADDR+0x08,1);
 
     while(1){
         // wait and store valid command
@@ -177,8 +220,6 @@ int main(void)
                                       iop_pins[14], iop_pins[15],
                                       iop_pins[16], iop_pins[17], 
                                       iop_pins[18]);
-    		// by default tristate timer output
-    		Xil_Out32(XPAR_GPIO_0_BASEADDR+0x08,1);
                 MAILBOX_CMD_ADDR = 0x0;
                 break;
 
@@ -221,7 +262,6 @@ int main(void)
                                       iop_pins[16], iop_pins[17], 
                                       iop_pins[18]);
      
-		
 		MAILBOX_CMD_ADDR = 0x0;
                 break;
 
@@ -255,15 +295,18 @@ int main(void)
                 break;
 
             case SET_SPEED:
-		// Set the duty cycle for putput PWM 
-		duty = MAILBOX_DATA(0);
+		motor = MAILBOX_DATA(0);
+		if (motor == MOTOR_A) {
+			duty_a = MAILBOX_DATA(0);
+		}
+		if (motor == MOTOR_B) {
+			duty_b = MAILBOX_DATA(0);
+		}
                 MAILBOX_CMD_ADDR = 0x0;
                 break;
 
             case RUN:
 		motor = MAILBOX_DATA(0);
-		// tri-state control negated so output can be driven
-                Xil_Out32(XPAR_GPIO_0_BASEADDR+0x08,0);
 		Channel_direction = Xil_In32(XPAR_GPIO_0_BASEADDR + 0x04);
 		Xil_Out32(XPAR_GPIO_0_BASEADDR + 0x04,SET_OUT(Channel_direction,(DIRA-5)));
 		Xil_Out32(XPAR_GPIO_0_BASEADDR + 0x04,SET_OUT(Channel_direction,(DIRB-5)));
@@ -276,17 +319,8 @@ int main(void)
 				Xil_Out32(XPAR_GPIO_0_BASEADDR, SET_LOW(Channel_Data,(DIRA-5))); 
 			}
 		
-		//Set the period corresponding to 490Hz
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0x296);
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 1, TCSR0, 0x296);
-                // period in us
-                Timer1Value = 2040 & 0x0ffff;
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR,0,
-                                 TLR0,Timer1Value*100);
-                // pulse in us
-                Timer2Value = (duty & 0x07f)*Timer1Value/100;
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR,1,
-                                 TLR0,Timer2Value*100);
+                timer_a_duty = (duty_a)*MS1_VALUE/100;
+		setup_start_timers_A(timer_a_duty*100);
 		}
 		else if(motor == MOTOR_B) {
 			if(dir_B){
@@ -296,17 +330,8 @@ int main(void)
 				Xil_Out32(XPAR_GPIO_0_BASEADDR, SET_LOW(Channel_Data,(DIRB-5)));
 			}
 
-		
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0x296);
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 1, TCSR0, 0x296);
-                //Set the period corresponding to 490Hz
-                Timer1Value = 2040 & 0x0ffff;
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR,0,
-                                 TLR0,Timer1Value*100);
-                // pulse in us
-                Timer2Value = (duty & 0x07f)*Timer1Value/100;
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR,1,
-                                 TLR0,Timer2Value*100);
+                timer_b_duty = (duty_b)*MS1_VALUE/100;
+		setup_start_timers_B(timer_b_duty*100);
 		}
 		
                 MAILBOX_CMD_ADDR = 0x0;
@@ -315,18 +340,10 @@ int main(void)
             case STOP:
 		motor = MAILBOX_DATA(0);
 		if (motor == MOTOR_A) {
-		//Stop the generation of PWM signal
-		// disable timer 0
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0);
-                // disable timer 1
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 1, TCSR0, 0);
+		stop_timers_A();
 		}
 		else if (motor == MOTOR_B){
-		//Stop the generation of PWM signal
-		// disable timer 0
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 0, TCSR0, 0);
-                // disable timer 1
-                XTmrCtr_WriteReg(XPAR_TMRCTR_0_BASEADDR, 1, TCSR0, 0);
+		stop_timers_B();
 		}
                 MAILBOX_CMD_ADDR = 0x0;
                 break;
