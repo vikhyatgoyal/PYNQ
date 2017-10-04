@@ -74,10 +74,10 @@
 #define TLR1 0x14
 // TCR1 Timer 1 Counter Register
 #define TCR1 0x18
-// Default period value for 490Hz
-#define MS1_VALUE 203998
+// Default period value for 490hz
+#define MS1_VALUE 2038
 // Default period value for 50% duty cycle
-#define MS2_VALUE 101998
+#define MS2_VALUE 1018
 
 // Mailbox commands
 #define CONFIG_IOP_SWITCH  	0x1
@@ -297,10 +297,10 @@ int main(void)
             case SET_SPEED:
 		motor = MAILBOX_DATA(0);
 		if (motor == MOTOR_A) {
-			duty_a = MAILBOX_DATA(0);
+			duty_a = MAILBOX_DATA(1);
 		}
 		if (motor == MOTOR_B) {
-			duty_b = MAILBOX_DATA(0);
+			duty_b = MAILBOX_DATA(1);
 		}
                 MAILBOX_CMD_ADDR = 0x0;
                 break;
@@ -320,7 +320,7 @@ int main(void)
 			}
 		
                 timer_a_duty = (duty_a)*MS1_VALUE/100;
-		setup_start_timers_A(timer_a_duty*100);
+		setup_start_timers_A(timer_a_duty);
 		}
 		else if(motor == MOTOR_B) {
 			if(dir_B){
@@ -331,7 +331,7 @@ int main(void)
 			}
 
                 timer_b_duty = (duty_b)*MS1_VALUE/100;
-		setup_start_timers_B(timer_b_duty*100);
+		setup_start_timers_B(timer_b_duty);
 		}
 		
                 MAILBOX_CMD_ADDR = 0x0;
