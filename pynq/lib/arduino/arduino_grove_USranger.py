@@ -207,11 +207,9 @@ class Grove_USranger(object):
         elif head_ptr < tail_ptr:
             num_words = int(ceil((tail_ptr - head_ptr) / 4))
             data = self.microblaze.read(head_ptr, num_words)
-            print (data)
             for i in range(len(data)) :
               data[i] = (data[i]*0.01)/58
             readings += data
-            print (readings)
         else:
             num_words = int(ceil((GROVE_USRANGER_LOG_END - head_ptr) / 4))
             data = self.microblaze.read(head_ptr, num_words)
@@ -226,5 +224,4 @@ class Grove_USranger(object):
             for i in range(len(data)) :
               data[i] = (data[i]*0.01)/58
             readings += data
-            print (readings)
         return readings
