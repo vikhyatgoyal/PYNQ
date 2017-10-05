@@ -67,7 +67,7 @@ class Arduino_Ardumoto(object):
 
     """
     def __init__(self, mb_info):
-        """Return a new instance of an arduino_joystick_shield object. 
+        """Return a new instance of an arduino_ardumoto_shield object. 
         
         Parameters
         ----------
@@ -77,9 +77,14 @@ class Arduino_Ardumoto(object):
 	"""
 
         self.microblaze = Arduino(mb_info, arduino_joystick_shield_PROGRAM)
-        self.log_interval_ms = 1000
-        self.log_running = 0
-        
+        self.defaultpins = 0
+        self.alternatepins = 1
+        self.pol_default = 0
+        self.pol_reverse = 1
+        self.motorA = 0
+        self.motorB = 1
+        self.forward = 0
+        self.backward = 1
         # Write configuration and wait for ACK
 
         self.microblaze.write_blocking_command(CONFIG_IOP_SWITCH)
@@ -99,8 +104,8 @@ class Arduino_Ardumoto(object):
 	Parameters
         ----------
         pin_comb : int
-	0 - Default Configuration (2,3,4,11)
-	1 - Alternate Configuration (8,9,7,10)
+	0 - defaultpins = Default Configuration (2,3,4,11)
+	1 - alternatepins = Alternate Configuration (8,9,7,10)
     
         Returns
         -------
@@ -109,21 +114,22 @@ class Arduino_Ardumoto(object):
         self.microblaze.write_mailbox(0, pin_comb)
         self.microblaze.write_blocking_command(CONFIGURE)
 
-    def configure_dir(self, sense):
+    def configure_polarity(self, mot, polarity):
         """Direction of rotation of motor depends on the polarity connected to the battery.
 	   user should set the Clockwise and counter-clockwise definitions, Depending on how the motor is wired.
 
 	Parameters
         ----------
         sense : int
-	0 - FORWARD - Clockwise
-	1 - REVERSE - Clockwise
+	0 - pol_default = FORWARD - Clockwise
+	1 - pol_reverse = REVERSE - Clockwise
     
         Returns
         -------
         none    
         """
-        self.microblaze.write_mailbox(0, sense)
+        self.microblaze.write_mailbox(0, mot)
+        self.microblaze.write_mailbox(0x4, polarity)
         self.microblaze.write_blocking_command(RECONFIGURE_DIR)
 
 
@@ -133,12 +139,12 @@ class Arduino_Ardumoto(object):
 	Parameters
         ----------
         mot : int
-	0 - Motor A (connected to (2,3) or (8,9))
-	1 - Motor B (connected to (4,11) or (7,10))
+	0 : motorA- Motor A (connected to (2,3) or (8,9))
+	1 : motorB- Motor B (connected to (4,11) or (7,10))
 
 	direction : int
-	0 - Run FORWARD
-	1 - Run REVERSE
+	0 - forward : Run FORWARD
+	1 - backward : Run REVERSE
     
         Returns
         -------

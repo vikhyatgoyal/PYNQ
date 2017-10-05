@@ -74,10 +74,10 @@
 #define TLR1 0x14
 // TCR1 Timer 1 Counter Register
 #define TCR1 0x18
-// Default period value for 490hz
-#define MS1_VALUE 2038
+// Default period value for 49hz
+#define MS1_VALUE 625998
 // Default period value for 50% duty cycle
-#define MS2_VALUE 1018
+#define MS2_VALUE 312998
 
 // Mailbox commands
 #define CONFIG_IOP_SWITCH  	0x1
@@ -101,7 +101,7 @@ MOTOR_A = 0,
 MOTOR_B
 }motor_e;
 
-int clockwise = 0; // default FORWARD  is clockwise and REVERSE is anticlockwise
+int pol_a = 0, pol_b = 0; // default polarity is mapped as FORWARD  is clockwise and REVERSE is anticlockwise
 u32 duty = 1;
 
 #define SET_OUT(x,n) (x &= ~(1 << n))
@@ -266,8 +266,14 @@ int main(void)
                 break;
 
             case RECONFIGURE_DIR:
-		clockwise = MAILBOX_DATA(0);
-		MAILBOX_CMD_ADDR = 0x0;
+		motor = MAILBOX_DATA(0);
+		if (motor == MOTOR_A) {
+			pol_a = MAILBOX_DATA(1);
+		}
+		if (motor == MOTOR_B) {
+			pol_b = MAILBOX_DATA(1);
+		}
+                MAILBOX_CMD_ADDR = 0x0;
                 break;
 
 
@@ -276,18 +282,18 @@ int main(void)
 		dir = MAILBOX_DATA(1);
 		if (motor == MOTOR_A){
 			if(dir) {
-				dir_A = clockwise;
+				dir_A = pol_a;
 			}
 			else {
-				dir_A = !(clockwise);
+				dir_A = !(pol_a);
 			}
 		}
 		else if (motor == MOTOR_B){
 			if(dir) {
-				dir_B = clockwise;
+				dir_B = pol_b;
 			}
 			else {
-				dir_B = !(clockwise);
+				dir_B = !(pol_b);
 			}
 		}
 

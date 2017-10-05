@@ -116,7 +116,7 @@ class Grove_USranger(object):
         self.microblaze.write_mailbox(0, self.USrangerpin)
         self.microblaze.write_blocking_command(READ)
         value = self.microblaze.read_mailbox(0)
-        value = value * self.clk_period_ns * (0.001) #convert value to useconds
+        value = value * self.clk_period_ns*(0.001) #convert value to useconds
         if((value*0.001) > 30): #If more than 30msec take as no obstacle
           return (500)
         else:
@@ -207,9 +207,11 @@ class Grove_USranger(object):
         elif head_ptr < tail_ptr:
             num_words = int(ceil((tail_ptr - head_ptr) / 4))
             data = self.microblaze.read(head_ptr, num_words)
+            print (data)
             for i in range(len(data)) :
               data[i] = (data[i]*0.01)/58
             readings += data
+            print (readings)
         else:
             num_words = int(ceil((GROVE_USRANGER_LOG_END - head_ptr) / 4))
             data = self.microblaze.read(head_ptr, num_words)
@@ -224,4 +226,5 @@ class Grove_USranger(object):
             for i in range(len(data)) :
               data[i] = (data[i]*0.01)/58
             readings += data
+            print (readings)
         return readings
